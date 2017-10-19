@@ -1,13 +1,14 @@
-
-
+function snowy_pictures_gmm
+addpath('./tools')
+nice_colors
 %%
 % Loop through pictures
 clear
 all_betas = [0.0001 0.5 1 100];
 win_mix = {};
 
-for m = 1:10
-    pic = imread(['./snowy_pictures_VPT/snowy_pictures_' sprintf('%d',m) '.jpg']);
+for m = 1:24
+    pic = imread(['./snowy_pictures/snowy_pictures_' sprintf('%d',m) '.jpg']);
     m
     n = 1;
     for i = 1:size(pic,1)
@@ -21,13 +22,6 @@ for m = 1:10
         end
     end
     y = pic_data;
-%     % Visualize data against picture
-%     figure(1)
-%     clf
-%     subplot(1,2,1);
-%     image(pic);
-%     subplot(1,2,2);
-%     scatter(y(:,1),y(:,2),'.');
 
     for b = 1:4
         BE = all_betas(b);
@@ -45,11 +39,6 @@ for m = 1:10
         end
         all_idx(m,b) = idx;
     
-%         subplot(2,2,b);
-%         hold on;
-%         plot_mix(mix,[0 200 0 200],1,'r');
-%         plot(y(:,1),y(:,2),'.');
-
         % Response model
         if all_idx(m,b) > 2
             is_image(m,b) = 1;
@@ -59,21 +48,21 @@ for m = 1:10
     end
 end
 
-save workspace_gmm_nov22
+save workspace_gmm_sep22
 
 
 %% Pick out FE and response model
 
 addpath(genpath('./tools'));
 addpath(genpath('../../../tools'));
+nice_colors
 
-red = [0.6350    0.0780    0.1840];
-blue = [0    0.4470    0.7410];
+%%
 truth = [1 3 4 5 6 10 11 17 19 21 22 24];
 no_pic = [2 7 8 9 12 13 14 15 16 18 20 23];
 for t = 1:24
     if ismember(t,truth)
-    pic_exists(t) = 1;
+        pic_exists(t) = 1;
     else  
        pic_exists(t) = 0;
     end
@@ -92,7 +81,7 @@ resp_model = win_f./all_idx;
 for b = 1:4
     for m = 1:24
         
-        if all_idx(m,b) >= 10
+        if all_idx(m,b) >= 10 && rand > 0.8
             is_image(m,b) = 1;
         else
             if rand >= 0.5
@@ -116,19 +105,22 @@ accuracy(4,2) = 0.1;
 %%
 figure(201);
 subplot(1,2,1);
-bar(mean(all_idx,1), 'FaceColor','k');
-set(gca,'XTickLabel',{'0.01', '0.5', '1', '100'})
+bar(mean(all_idx(:,[1 2 4]),1), 'FaceColor',grey,'EdgeColor','k');
+set(gca,'XTickLabel',{'0.01', '1', '100'})
 xlabel('\beta value');
 ylabel('No. features');
 
+%
 subplot(1,2,2);
-b = bar(accuracy);
-b(1).FaceColor = blue;
-b(1).EdgeColor = 'none';
-b(2).FaceColor = red;
-b(2).EdgeColor = 'none';
-set(gca,'XTickLabel',{'0.01', '0.5', '1', '100'})
+b = bar(accuracy([1 2 4],:));
+b(1).FaceColor = grey;
+b(1).EdgeColor = 'k';
+b(2).FaceColor = 'k';
+b(2).EdgeColor = 'k';
+set(gca,'XTickLabel',{'0.01','1', '100'})
 xlabel('\beta value');
-ylabel('Accuracy');
-purty_plot(201,'../figures/BIpaper_Figure4', 'png');
+ylabel('False pos/neg');
+legend 'False Pos' 'False Neg'
+ylim([0 13]);
+purty_plot(201,'../figures/Figure4', 'eps');
 

@@ -6,64 +6,87 @@ addpath('./tools');
 % Overconfidence
 clear
 nice_colors
-run_sim = 1;
-if run_sim
-    
-    N = 100;
-    
-    % Random attribution
-    X = rand(N,1);
-    y = binornd(1,0.2,100,1);
-    
-    % Priors
-    a0 = 1e-2;
-    b0 = 1e-4;
-    
-    
-    hold on
-    % Low is unbounded, high is bounded
-    BE = [0.1 1 100];
-    for b = 1:length(BE)
-        bb = BE(b);
-        [w(b), V, invV, logdetV, E_a(b), L] = vb_logit_fit_beta(X, y,a0,b0,bb);
-        p(:,b) = 1./(1+exp(-X*w(b)));
+
+
+N = 1000;
+
+% Random attribution
+%X = rand(N,1);
+bet_size = randi(10,N,1);
+losses = 0;
+for i = 1:N
+    num_losses(i) = losses;
+    if rand < 0.05
+        game_trace(i) = 2*bet_size(i);
+        winloss(i) = 1;
+        losses = 0;
+    else
+        game_trace(i) = -bet_size(i);
+        winloss(i) = 0;
+        losses = losses + 1;
     end
-    
-    Xnew = randn(N,1);
-    Xnew = repmat(Xnew,1,3);
-    w_mat = repmat(w,N,1);
-    pnew =1./(1+exp(-Xnew.*w_mat));
-    
-    % Specify bet size
-    large = 100;
-    small = 1;
-    winsizes = [0 50 100 150 200];
-    
-    for cc = 1:100
-        clear bet_size account
-        account(1,1:3)= N;
-        for d = 1:3
-            for j = 1:N
-                if pnew(j,d) > 0.55
-                    bet_size(j,d) = large;
-                else
-                    bet_size(j,d) = small;
-                end
-                
-                do_win = binornd(1,pnew(j,2));
-                if do_win == 1
-                    account(j,d) = account(j,d)-bet_size(j,d)+datasample(winsizes,1);
-                else
-                    account(j,d) = account(j,d)-bet_size(j,d);
-                end
-                account(j+1,d) = account(j,d);
-            end
-        end
-        all_account(:,:,cc) = account;
-    end
-else
-    load impulsive_gambler_simulation
 end
+
+account = cumsum([1000 game_trace]);
+
+X = account(1:end-1)';
+X = num_losses';
+y = winloss';
+%y = binornd(1,0.,N,1);
+%
+% Priors
+a0 = 1;
+b0 = 2;
+
+% Low is unbounded, high is bounded
+BE = [0.1 1 100];
+for b = 1:length(BE)
+    bb = BE(b);
+    [w(b), V, invV, logdetV, E_a(b), L] = vb_logit_fit_beta(X, y,a0,b0,bb);
+    p(:,b) = 1./(1+exp(-X*w(b)));
+end
+
+
+plot(p)
+
+%%
+
+Xnew = randn(N,1);
+Xnew = repmat(Xnew,1,3);
+w_mat = repmat(w,N,1);
+pnew =1./(1+exp(-Xnew.*w_mat));
+
+%%
+
+% Specify bet size
+large = 100;
+small = 1;
+winsizes = [0 50 100 150 200];
+
+for cc = 1:100
+    clear bet_size account
+    account(1,1:3)= N;
+    for d = 1:3
+        for j = 1:N
+            if pnew(j,d) > 0.55
+                bet_size(j,d) = large;
+            else
+                bet_size(j,d) = small;
+            end
+            
+            do_win = binornd(1,pnew(j,2));
+            if do_win == 1
+                account(j,d) = account(j,d)-bet_size(j,d)+datasample(winsizes,1);
+            else
+                account(j,d) = account(j,d)-bet_size(j,d);
+            end
+            account(j+1,d) = account(j,d);
+        end
+    end
+    all_account(:,:,cc) = account;
+end
+
+
 
 %% Plot simulation
 figure(101)
@@ -106,8 +129,8 @@ V = inv(invV);
 w = V * t_w;
 bn = BE*(b0 + 0.5 * (w' * w + trace(V)));
 L_last = - N * log(2) ...
-         + 0.5 * (w' * invV * w - logdet(invV)) ...
-         - an / bn * b0 - an * log(bn) + gammaln_an_an;
+    + 0.5 * (w' * invV * w - logdet(invV)) ...
+    - an / bn * b0 - an * log(bn) + gammaln_an_an;
 
 
 %% update xi, bn, (V, w) iteratively
@@ -115,26 +138,26 @@ for i = 1:max_iter;
     % update xi by EM-algorithm
     xi = sqrt(sum(X .* (X * (V + w * w')), 2));
     lam_xi = lam(xi);
-
+    
     % update posterior parameters of a based on xi
     bn = BE*(b0 + 0.5 * (w' * w + trace(V)));
     E_a = an / bn;
-
+    
     % recompute posterior parameters of w
     invV = BE*E_a * eye(D) + 2 * X' * bsxfun(@times, X, lam_xi);
     V = inv(invV);
     logdetV = - logdet(invV);
     w = V * t_w;
-
+    
     % variational bound, ingnoring constant terms for now
     L = - sum(log(1 + exp(- xi))) + sum(lam_xi .* xi .^ 2) ...
         + 0.5 * (w' * invV * w + BE*logdetV - sum(xi)) ...
         - BE*E_a * b0 - BE*an * log(bn) + BE*gammaln_an_an;
-
+    
     if (L_last > L) || (abs(L_last - L) < abs(0.00001 * L))
         break
     end
-    L_last = L;  
+    L_last = L;
 end;
 if i == max_iter
     warning('Bayes:maxIter', ...
